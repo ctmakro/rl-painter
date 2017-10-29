@@ -66,8 +66,9 @@ class nnagent(object):
         rect = Act('selu')
         c = Can()
         c.add(stacking)
+        c.add(Lambda(lambda i:i/255.-0.5)) # normalize the images
         def ca(i,o,k,s):
-            c.add(Conv2D(i,o,k,s))
+            c.add(Conv2D(i,o,k=k,std=s,stddev=1))
             c.add(rect)
 
         ca(6,16,3,1)
@@ -85,9 +86,9 @@ class nnagent(object):
         c = Can()
         rect = Act('selu')
         c.add(self.create_feature_network())
-        c.add(Dense(64,64))
+        c.add(Dense(64,64,stddev=1))
         c.add(rect)
-        c.add(Dense(64,outputdims))
+        c.add(Dense(64,outputdims,stddev=1))
         c.add(Act('sigmoid'))
         c.chain()
         return c
@@ -100,8 +101,8 @@ class nnagent(object):
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
 
-        den1 = c.add(Dense(64+actiondims,64))
-        den2 = c.add(Dense(64, 1))
+        den1 = c.add(Dense(64+actiondims,64,stddev=1))
+        den2 = c.add(Dense(64, 1, stddev=1))
 
         def call(i):
             state = i[0]
