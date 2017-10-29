@@ -43,7 +43,7 @@ class CanvasEnv:
 
     def diff(self):
         # calculate difference between two image. you can use different metrics to encourage different characteristics.
-        se = (self.target.astype('int16') - self.canvas.astype('int16'))**2
+        se = (self.target.astype('float32') - self.canvas.astype('float32'))**2
         mse = np.mean(se)/255.
         return mse
 
