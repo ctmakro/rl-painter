@@ -15,3 +15,14 @@ The higher the total reward, the better your agent have painted.
 `python env.py` to test the environment.
 
 `ipython -i ddpg2.py` then `r(10000)` to test the env with a naive DDPG algorithm.
+
+## Dependencies
+
+- opencv-python with OpenCV3.x
+- a few other helping libraries. Please refer to code.
+- Python 3.5+
+
+## RL-specific details
+
+- the observation is Markovian.
+- human could achieve this task by trial-and-error before finally making a step. Therefore the optimal policy might involve some other classical algorithmic component(search, local optimization, or even modeling) atop deep neural networks.
