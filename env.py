@@ -14,13 +14,16 @@ from cv2tools import vis,filt
 import gym
 from gym.spaces import Box
 
-lena = cv2.imread('Lenna.png').astype('uint8') #saves space
+lena = cv2.imread('Lenna_neutrual.png').astype('uint8') #saves space
 smaller_lena = cv2.resize(lena,dsize=(64,64),interpolation=cv2.INTER_CUBIC)
 
 def load_random_image():
     # load a random image and return. byref is preferred.
     # here we return the same image everytime.
-    return smaller_lena
+    bias = np.random.uniform(size=(1,1,3))*0.3
+    gain = np.random.uniform(size=(1,1,3))*0.7 + 0.7
+    randomized_lena = np.clip(smaller_lena * gain + bias, 0, 255).astype('uint8')
+    return randomized_lena
 
 # Environment Specification
 # observation: tuple(image,image)
@@ -61,16 +64,28 @@ class CanvasEnv:
         height,width,depth = self.canvas.shape
         sheight,swidth = height*16,width*16 # leftshift bits
 
-        # paint a stroke
-        cv2.line(
-            self.canvas,
-            (int(x1*swidth),int(y1*sheight)), # point coord
-            (int(x2*swidth),int(y2*sheight)),
-            (int(r*255),int(g*255),int(b*255)), # color
-            int(radius**2*width*0.3+1.5), # thickness
-            cv2.LINE_AA, # antialiasing
-            4 # rightshift bits
-        )
+        if False:
+            # paint a stroke
+            cv2.line(
+                self.canvas,
+                (int(x1*swidth),int(y1*sheight)), # point coord
+                (int(x2*swidth),int(y2*sheight)),
+                (int(r*255),int(g*255),int(b*255)), # color
+                int(radius**2*width*0.2+4), # thickness
+                cv2.LINE_AA, # antialiasing
+                4 # rightshift bits
+            )
+        else:
+            # paint a dot
+            cv2.circle(
+                self.canvas,
+                (int(x1*swidth),int(y1*sheight)), # point coord
+                int(radius**2*width*0.2*16+4*16), # radius
+                (int(r*255),int(g*255),int(b*255)), # color
+                -1,
+                cv2.LINE_AA,
+                4
+            )
 
         # calculate reward
         diff = self.diff()

@@ -38,8 +38,8 @@ class nnagent(object):
     action_space,
     discount_factor=.99, # gamma
     ):
-        self.rpm = rpm(1000000) # 1M history
-        self.plotter = plotter(num_lines=1)
+        self.rpm = rpm(100000) # 10k history
+        self.plotter = plotter(num_lines=2)
         self.render = True
         self.training = True
 
@@ -68,16 +68,21 @@ class nnagent(object):
         c.add(stacking)
         c.add(Lambda(lambda i:i/255.-0.5)) # normalize the images
         def ca(i,o,k,s):
-            c.add(Conv2D(i,o,k=k,std=s,stddev=1))
+            c.add(Conv2D(i,o,k=k,std=s,stddev=1,padding='SAME'))
             c.add(rect)
 
-        ca(6,16,3,1)
-        ca(16,32,3,2)
-        ca(32,32,3,2)
-        ca(32,32,3,2)
-        ca(32,64,3,2)
-
-        c.add(Lambda(lambda i:tf.reduce_mean(i,axis=[1,2])))
+        ca(6,16,5,1) #64
+        ca(16,32,5,2) #32
+        ca(32,32,5,2)
+        ca(32,32,5,2)
+        ca(32,32,5,2) #4
+        
+        def flatten(i):
+            s = tf.shape(i)
+            return tf.reshape(i,[s[0], s[1]*s[2]*s[3]])
+        c.add(Lambda(flatten))
+        # 32*4*4
+        # c.add(Lambda(lambda i:tf.reduce_mean(i,axis=[1,2])))
         c.chain()
         return c
 
@@ -86,7 +91,9 @@ class nnagent(object):
         c = Can()
         rect = Act('selu')
         c.add(self.create_feature_network())
-        c.add(Dense(64,64,stddev=1))
+        c.add(Dense(512,128,stddev=1))
+        c.add(rect)
+        c.add(Dense(128,64,stddev=1))
         c.add(rect)
         c.add(Dense(64,outputdims,stddev=1))
         c.add(Act('sigmoid'))
@@ -101,9 +108,9 @@ class nnagent(object):
         concat = Lambda(lambda x:tf.concat([x[0],x[1]],axis=1))
         # concat state and action
 
-        den1 = c.add(Dense(64+actiondims,64,stddev=1))
-        den2 = c.add(Dense(64, 1, stddev=1))
-
+        den1 = c.add(Dense(512+actiondims,128,stddev=1))
+        den2 = c.add(Dense(128, 64, stddev=1))
+        den3 = c.add(Dense(64, 1, stddev=1))
         def call(i):
             state = i[0]
             action = i[1]
@@ -112,7 +119,8 @@ class nnagent(object):
 
             concated = concat([feat,action])
             h1 = rect(den1(concated))
-            q = den2(h1)
+            h2 = rect(den2(h1))
+            q = den3(h2)
             return q
 
         c.set_function(call)
@@ -224,13 +232,14 @@ class nnagent(object):
         max_steps = max_steps if max_steps > 0 else 50000
         steps = 0
         total_reward = 0
+        total_q = 0
 
         observation = env.reset()
 
         while True and steps <= max_steps:
             steps +=1
 
-            action = self.act(observation) # a1
+            action,q = self.act(observation) # a1
 
             # exploration
             exploration_noise = np.random.normal(size=(self.outputdims,))*noise_level
@@ -243,7 +252,8 @@ class nnagent(object):
             # d1
             isdone = 1 if done else 0
             total_reward += reward
-
+            total_q += q
+            
             # feed into replay memory
             if self.training == True:
                 self.feed_one(
@@ -264,7 +274,7 @@ class nnagent(object):
         steps,totaltime,totaltime/steps,total_reward
         ))
 
-        self.plotter.pushys([total_reward])
+        self.plotter.pushys([total_reward,total_q/steps])
         return
 
     # one step of action, given observation
@@ -277,7 +287,7 @@ class nnagent(object):
         [actions,q] = self.joint_inference(obs)
         actions,q = actions[0],q[0]
 
-        return actions
+        return actions,q
 
     def save_weights(self):
         networks = ['actor','critic','actor_target','critic_target']
@@ -305,10 +315,10 @@ if __name__=='__main__':
         global noise_level,e
         # agent.render = True
         for i in range(ep):
-            noise_level *= .99
+            noise_level *= .995
             noise_level = max(1e-3, noise_level)
             print('ep',i,'/',ep,'noise_level',noise_level)
-            agent.play(e,realtime=True,max_steps=50,noise_level=noise_level)
+            agent.play(e,realtime=True,max_steps=60,noise_level=noise_level)
 
     def test():
         e = p.env
